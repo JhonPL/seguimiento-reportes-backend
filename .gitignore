@@ -1,0 +1,170 @@
+# ==================== MAVEN ====================
+HELP.md
+target/
+!.mvn/wrapper/maven-wrapper.properties
+!**/src/main/**/target/
+!**/src/test/**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# ==================== GRADLE ====================
+.gradle
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# ==================== IDEs ====================
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Eclipse ###
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+local.properties
+
+# ==================== LOGS ====================
+*.log
+logs/
+spring.log
+**/logs/
+
+# ==================== CONFIGURACIÓN SENSIBLE ====================
+
+### Credenciales y secretos ###
+**/client_secret.json
+**/client_secret*.json
+**/credentials.json
+**/StoredCredential
+tokens/
+**/tokens/
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+### Variables de entorno ###
+.env
+*.env
+.env.*
+.env.local
+.env.development
+.env.production
+
+### Propiedades locales/producción ###
+application-local.properties
+application-local.yml
+application-prod.properties
+application-prod.yml
+application-secret.properties
+application-secret.yml
+**/src/main/resources/application-local.*
+**/src/main/resources/application-prod.*
+**/src/main/resources/application-secret.*
+
+
+# ==================== BASE DE DATOS ====================
+*.db
+*.h2.db
+*.trace.db
+*.lock.db
+*.backup
+*.dump
+*.sql.gz
+backend/backups/
+**/backups/
+
+# ==================== DOCKER ====================
+postgres_data/
+pgadmin_data/
+mysql_data/
+mongo_data/
+redis_data/
+**/docker-volumes/
+
+# ==================== ARCHIVOS SUBIDOS ====================
+uploads/
+**/uploads/
+storage/
+**/storage/
+files/
+**/files/
+
+# ==================== OS GENERADOS ====================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# ==================== ARCHIVOS TEMPORALES ====================
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+\#*\#
+
+# ==================== TEST Y COVERAGE ====================
+jacoco.exec
+*.exec
+coverage/
+test-output/
+surefire-reports/
+
+# ==================== OTROS ====================
+.lombok/
+.tern-port
+*.class
+*.jar
+!**/src/main/**/lib/*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
