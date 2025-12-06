@@ -1,0 +1,40 @@
+---
+
+## 📝 **Y el .dockerignore también (copia completo):**
+```
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+
+# IDEs
+.idea/
+*.iml
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Node (si tienes frontend en el mismo repo)
+node_modules/
+
+# Otros
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
