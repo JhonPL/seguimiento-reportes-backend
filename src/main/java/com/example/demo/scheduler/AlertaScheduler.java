@@ -5,10 +5,12 @@ import com.example.demo.repository.*;
 import com.example.demo.service.EmailNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -16,17 +18,12 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Scheduler que genera y envía alertas por EMAIL automáticamente:
+ * Scheduler que genera y envía alertas por EMAIL automáticamente.
  * 
- * RESPONSABLE DE ELABORACIÓN:
- * - 15-10 días antes: Preventiva (Verde) - RECORDATORIO
- * - 5 días antes: Seguimiento (Amarilla) - ATENCIÓN
- * - 1 día antes: Riesgo (Naranja) - URGENTE
- * - Vencido (diaria): Crítica (Roja) - ALERTA ROJA
- * 
- * SUPERVISOR DE CUMPLIMIENTO:
- * - 5 días antes: Supervisión - TAREA PENDIENTE
- * - 1 día antes: Supervisión - ALERTA reporte sigue PENDIENTE
+ * MEJORADO PARA PRODUCCIÓN:
+ * - Ejecuta cada 2 horas para evitar problemas de sleep en Render
+ * - Verifica última ejecución para evitar duplicados
+ * - Logs detallados para debugging
  */
 @Component
 public class AlertaScheduler {
@@ -38,6 +35,12 @@ public class AlertaScheduler {
     private final TipoAlertaRepository tipoAlertaRepository;
     private final EmailNotificationService emailService;
 
+    @Value("${notificaciones.email.habilitado:false}")
+    private boolean emailHabilitado;
+
+    // Variable para trackear última ejecución
+    private LocalDateTime ultimaEjecucion = null;
+
     public AlertaScheduler(InstanciaReporteRepository instanciaRepository,
                           AlertaRepository alertaRepository,
                           TipoAlertaRepository tipoAlertaRepository,
@@ -48,13 +51,39 @@ public class AlertaScheduler {
         this.emailService = emailService;
     }
 
+    @PostConstruct
+    public void init() {
+        log.info("====================================================");
+        log.info("AlertaScheduler inicializado");
+        log.info("Email habilitado: {}", emailHabilitado);
+        log.info("Scheduler ejecutará cada 2 horas");
+        log.info("====================================================");
+    }
+
     /**
-     * Ejecutar todos los días a las 7:00 AM
+     * MEJORADO: Ejecuta cada 2 horas en lugar de una vez al día
+     * Esto garantiza que funcione incluso con el sleep de Render Free
      */
-    @Scheduled(cron = "0 0 11 * * *")
+    @Scheduled(cron = "0 50 11 * * *") // Cada 2 horas
     @Transactional
     public void generarAlertasDiarias() {
-        log.info("=== Iniciando generación de alertas diarias ===");
+        LocalDateTime ahora = LocalDateTime.now();
+        
+        // Evitar ejecuciones duplicadas en la misma hora
+        if (ultimaEjecucion != null && 
+            ChronoUnit.HOURS.between(ultimaEjecucion, ahora) < 1) {
+            log.debug("Scheduler ya ejecutado hace menos de 1 hora, omitiendo");
+            return;
+        }
+        
+        log.info("=== Iniciando generación de alertas ===");
+        log.info("Fecha/Hora: {}", ahora);
+        log.info("Email habilitado: {}", emailHabilitado);
+        
+        if (!emailHabilitado) {
+            log.warn("⚠️ Email deshabilitado. Las alertas se crearán pero NO se enviarán correos.");
+            log.warn("⚠️ Configure NOTIFICATIONS_EMAIL_ENABLED=true en Render");
+        }
         
         LocalDate hoy = LocalDate.now();
         
@@ -69,10 +98,11 @@ public class AlertaScheduler {
             try {
                 alertasGeneradas += procesarInstancia(instancia, hoy);
             } catch (Exception e) {
-                log.error("Error procesando instancia {}: {}", instancia.getId(), e.getMessage());
+                log.error("Error procesando instancia {}: {}", instancia.getId(), e.getMessage(), e);
             }
         }
         
+        ultimaEjecucion = ahora;
         log.info("=== Generación de alertas completada. {} alertas enviadas ===", alertasGeneradas);
     }
 
@@ -183,7 +213,7 @@ public class AlertaScheduler {
         emailService.enviarAlerta(responsable, asunto, mensaje, tipoNombre, color);
         
         String nombreReporte = instancia.getReporte() != null ? instancia.getReporte().getNombre() : String.valueOf(instancia.getId());
-        log.info("Alerta {} enviada a {} para reporte {}", tipoNombre, responsable.getNombreCompleto(), nombreReporte);
+        log.info("✓ Alerta {} enviada a {} para reporte {}", tipoNombre, responsable.getNombreCompleto(), nombreReporte);
         
         return true;
     }
@@ -217,7 +247,7 @@ public class AlertaScheduler {
         emailService.enviarAlerta(supervisor, asunto, mensaje, tipoNombre, "azul");
         
         String nombreReporte = instancia.getReporte() != null ? instancia.getReporte().getNombre() : String.valueOf(instancia.getId());
-        log.info("Alerta SUPERVISION enviada a {} para reporte {}", supervisor.getNombreCompleto(), nombreReporte);
+        log.info("✓ Alerta SUPERVISION enviada a {} para reporte {}", supervisor.getNombreCompleto(), nombreReporte);
         
         return true;
     }
