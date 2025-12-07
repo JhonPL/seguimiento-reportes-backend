@@ -9,6 +9,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 
@@ -22,25 +23,48 @@ public class EmailNotificationService {
     @Value("${spring.mail.username:}")
     private String fromEmail;
 
-    @Value("${app.notifications.email.enabled:true}")
+    // ⚠️ CAMBIO CRÍTICO #1: Usar la variable correcta
+    @Value("${notificaciones.email.habilitado:false}")
     private boolean emailEnabled;
 
     public EmailNotificationService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
     }
 
-    /**
-     * Enviar correo de alerta
-     */
+    // ✅ CAMBIO CRÍTICO #2: Agregar logs de inicialización
+    @PostConstruct
+    public void init() {
+        log.info("====================================================");
+        log.info("EmailNotificationService inicializado");
+        log.info("Email habilitado: {}", emailEnabled);
+        log.info("From email: {}", fromEmail != null && !fromEmail.isEmpty() ? fromEmail : "NO CONFIGURADO");
+        log.info("====================================================");
+        
+        if (!emailEnabled) {
+            log.warn("⚠️ NOTIFICACIONES POR EMAIL DESHABILITADAS");
+            log.warn("⚠️ Configure NOTIFICATIONS_EMAIL_ENABLED=true en Render");
+        }
+    }
+
+    // ✅ CAMBIO CRÍTICO #3: Agregar logs en enviarAlerta
     @Async
     public void enviarAlerta(Usuario usuario, String asunto, String mensaje, String tipoAlerta, String colorAlerta) {
+        // 🔍 LOGS PARA DEBUG
+        log.debug("🔍 Intentando enviar email a {}", usuario != null ? usuario.getCorreo() : "NULL");
+        
         if (!emailEnabled) {
-            log.info("Notificaciones por email deshabilitadas");
+            log.info("ℹ️ Notificaciones por email deshabilitadas - omitiendo envío");
             return;
         }
 
         if (usuario == null || usuario.getCorreo() == null || usuario.getCorreo().isEmpty()) {
-            log.warn("Usuario no tiene correo configurado");
+            log.warn("⚠️ Usuario no tiene correo configurado");
+            return;
+        }
+        
+        // 🔍 VALIDACIÓN ADICIONAL
+        if (fromEmail == null || fromEmail.isEmpty()) {
+            log.error("⚠️ SMTP_USER no configurado - no se puede enviar email");
             return;
         }
 
@@ -53,25 +77,35 @@ public class EmailNotificationService {
             String mensajeEmail = mensaje != null ? mensaje : "";
             String tipo = tipoAlerta != null ? tipoAlerta : "NOTIFICACIÓN";
             String color = colorAlerta != null ? colorAlerta : "azul";
-            String remitente = (fromEmail != null && !fromEmail.isEmpty()) ? fromEmail : "noreply@sistema.com";
             String destinatario = usuario.getCorreo();
 
-            helper.setFrom(remitente);
+            helper.setFrom(fromEmail);
             helper.setTo(destinatario);
             helper.setSubject("[" + tipo + "] " + asuntoEmail);
             helper.setText(construirHtmlEmail(nombreUsuario, mensajeEmail, tipo, color), true);
 
+            // 🔍 LOG ANTES DE ENVIAR
+            log.info("📧 Enviando email a {} - Asunto: {}", destinatario, asuntoEmail);
+            
             mailSender.send(mimeMessage);
-            log.info("Email enviado a {} - Asunto: {}", destinatario, asuntoEmail);
+            
+            // ✅ LOG DE ÉXITO
+            log.info("✅ Email enviado exitosamente a {}", destinatario);
 
         } catch (MessagingException e) {
-            log.error("Error enviando email a {}: {}", usuario.getCorreo(), e.getMessage());
+            log.error("❌ Error enviando email a {}: {}", usuario.getCorreo(), e.getMessage());
+        } catch (Exception e) {
+            log.error("❌ Error inesperado: {}", e.getMessage());
         }
     }
 
-    /**
-     * Construir HTML del email
-     */
+    // ✅ OPCIONAL PERO ÚTIL: Método para verificar si está habilitado
+    public boolean estaHabilitado() {
+        return emailEnabled;
+    }
+
+    // EL RESTO DEL CÓDIGO SE QUEDA IGUAL (construirHtmlEmail, obtenerColorHex, etc.)
+    
     private String construirHtmlEmail(String nombreUsuario, String mensaje, String tipoAlerta, String colorAlerta) {
         String colorHex = obtenerColorHex(colorAlerta);
         
@@ -114,9 +148,6 @@ public class EmailNotificationService {
             """.formatted(colorHex, colorHex, colorHex, nombreUsuario, tipoAlerta, mensaje.replace("\n", "<br>"));
     }
 
-    /**
-     * Obtener color hexadecimal según tipo
-     */
     private String obtenerColorHex(String colorAlerta) {
         if (colorAlerta == null) return "#3B82F6";
         
