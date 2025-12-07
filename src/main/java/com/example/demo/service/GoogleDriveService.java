@@ -42,6 +42,10 @@ public class GoogleDriveService {
     @Value("${google.drive.mode:service}") // oauth | service
     private String mode;
 
+    // Variable de entorno para producción
+    @Value("${GOOGLE_CREDENTIALS_JSON:#{null}}")
+    private String credentialsJson;
+
     private Drive driveService;
 
     // Carpeta donde se guarda el token OAuth generado
@@ -51,22 +55,22 @@ public class GoogleDriveService {
     public void init() {
         try {
             if ("oauth".equalsIgnoreCase(mode)) {
-                System.out.println("🔵 Google Drive MODO OAUTH (personal)");
+                System.out.println("Google Drive MODO OAUTH (personal)");
                 driveService = initOAuth();
             } else {
-                System.out.println("🟢 Google Drive MODO SERVICE ACCOUNT (empresa)");
+                System.out.println("Google Drive MODO SERVICE ACCOUNT (empresa)");
                 driveService = initServiceAccount();
             }
 
             System.out.println("✓ Google Drive inicializado correctamente");
 
         } catch (Exception e) {
-            System.err.println("⚠ Error inicializando Google Drive: " + e.getMessage());
+            System.err.println("Error inicializando Google Drive: " + e.getMessage());
         }
     }
 
     // ============================================================
-    // MODO A: OAuth (TÚ — usuario personal)
+    // MODO A: OAuth (usuario personal)
     // ============================================================
     private Drive initOAuth() throws Exception {
 
@@ -193,7 +197,7 @@ public class GoogleDriveService {
         try {
             driveService.files().delete(fileId).execute();
         } catch (Exception e) {
-            System.err.println("⚠ Error eliminando archivo: " + e.getMessage());
+            System.err.println("Error eliminando archivo: " + e.getMessage());
         }
     }
 
