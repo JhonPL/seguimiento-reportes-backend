@@ -1,5 +1,6 @@
 package com.example.demo.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -12,32 +13,39 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
 
+    @Value("${notificaciones.url.base:http://localhost:5173}")
+    private String frontendUrl;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Permitir estos orígenes (React en desarrollo)
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173",
-                "http://localhost:3000",
-                "http://localhost:8081",
-                "http://127.0.0.1:5173",
-                "http://127.0.0.1:3000",
-                "https://seguimiento-reportes-fronted-git-main-jhonpls-projects.vercel.app",
-                "https://seguimiento-reportes-backend.onrender.com"
+        // Orígenes permitidos (desarrollo + producción)
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+                frontendUrl,
+                "https://*.vercel.app",
+                "https://*.onrender.com",
+                "http://localhost:*",
+                "http://127.0.0.1:*"
         ));
 
-        // Permitir todos los métodos HTTP
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        // Métodos HTTP permitidos
+        configuration.setAllowedMethods(Arrays.asList(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
+        ));
 
-        // Permitir todos los headers
+        // Headers permitidos
         configuration.setAllowedHeaders(List.of("*"));
 
         // Permitir credenciales
         configuration.setAllowCredentials(true);
 
-        // Exponer headers de autorización
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        // Headers expuestos
+        configuration.setExposedHeaders(Arrays.asList(
+                "Authorization", 
+                "Content-Type",
+                "X-Total-Count"
+        ));
 
         // Tiempo de cache para preflight
         configuration.setMaxAge(3600L);
