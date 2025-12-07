@@ -64,7 +64,7 @@ public class AlertaScheduler {
      * MEJORADO: Ejecuta cada 2 horas en lugar de una vez al día
      * Esto garantiza que funcione incluso con el sleep de Render Free
      */
-    @Scheduled(cron = "0 50 11 * * *") // Cada 2 horas
+    @Scheduled(cron = "0 10 12 * * *") // Cada 2 horas
     @Transactional
     public void generarAlertasDiarias() {
         LocalDateTime ahora = LocalDateTime.now();
