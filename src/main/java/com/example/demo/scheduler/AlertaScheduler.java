@@ -18,9 +18,11 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Scheduler MEJORADO para Render Free Tier
- * - Ejecuta cada 2 horas para evitar el sleep de Render
- * - Evita duplicados con verificación de última ejecución
+ * Scheduler que genera y envía alertas por EMAIL automáticamente.
+ * 
+ * MEJORADO PARA PRODUCCIÓN:
+ * - Ejecuta cada 2 horas para evitar problemas de sleep en Render
+ * - Verifica última ejecución para evitar duplicados
  * - Logs detallados para debugging
  */
 @Component
@@ -36,6 +38,7 @@ public class AlertaScheduler {
     @Value("${notificaciones.email.habilitado:false}")
     private boolean emailHabilitado;
 
+    // Variable para trackear última ejecución
     private LocalDateTime ultimaEjecucion = null;
 
     public AlertaScheduler(InstanciaReporteRepository instanciaRepository,
@@ -51,94 +54,72 @@ public class AlertaScheduler {
     @PostConstruct
     public void init() {
         log.info("====================================================");
-        log.info("✓ AlertaScheduler inicializado");
-        log.info("✓ Email habilitado: {}", emailHabilitado);
-        log.info("✓ Zona horaria: {}", java.util.TimeZone.getDefault().getID());
-        log.info("✓ Scheduler ejecutará cada 2 horas");
+        log.info("AlertaScheduler inicializado");
+        log.info("Email habilitado: {}", emailHabilitado);
+        log.info("Scheduler ejecutará cada 2 horas");
         log.info("====================================================");
-        
-        // Ejecutar inmediatamente al iniciar (útil para testing)
-        if (emailHabilitado) {
-            log.info("🚀 Ejecutando generación de alertas al iniciar...");
-            Thread hilo = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        Thread.sleep(5000); // Esperar 5 segundos para que el sistema termine de iniciar
-                        generarAlertasDiarias();
-                    } catch (Exception e) {
-                        log.error("Error en ejecución inicial: {}", e.getMessage());
-                    }
-                }
-            });
-            hilo.start();
-        }
     }
 
     /**
-     * MEJORADO: Ejecuta cada 2 horas
-     * Cron: 0 0 */2 * * * = cada 2 horas en punto
+     * MEJORADO: Ejecuta cada 2 horas en lugar de una vez al día
+     * Esto garantiza que funcione incluso con el sleep de Render Free
      */
-    @Scheduled(cron = "0 0 */2 * * *")
+    @Scheduled(cron = "0 0 */2 * * *") // Cada 2 horas
     @Transactional
     public void generarAlertasDiarias() {
         LocalDateTime ahora = LocalDateTime.now();
         
         // Evitar ejecuciones duplicadas en la misma hora
         if (ultimaEjecucion != null && 
-            ChronoUnit.MINUTES.between(ultimaEjecucion, ahora) < 30) {
-            log.debug("⏭️ Scheduler ya ejecutado hace menos de 30 minutos, omitiendo");
+            ChronoUnit.HOURS.between(ultimaEjecucion, ahora) < 1) {
+            log.debug("Scheduler ya ejecutado hace menos de 1 hora, omitiendo");
             return;
         }
         
-        log.info("=================================================");
-        log.info("🔔 Iniciando generación de alertas");
-        log.info("📅 Fecha/Hora: {}", ahora);
-        log.info("✉️ Email habilitado: {}", emailHabilitado);
-        log.info("=================================================");
+        log.info("=== Iniciando generación de alertas ===");
+        log.info("Fecha/Hora: {}", ahora);
+        log.info("Email habilitado: {}", emailHabilitado);
         
         if (!emailHabilitado) {
-            log.warn("⚠️ Email deshabilitado. Configure NOTIFICATIONS_EMAIL_ENABLED=true");
-            return;
+            log.warn("⚠️ Email deshabilitado. Las alertas se crearán pero NO se enviarán correos.");
+            log.warn("⚠️ Configure NOTIFICATIONS_EMAIL_ENABLED=true en Render");
         }
         
         LocalDate hoy = LocalDate.now();
+        
+        // Obtener todas las instancias pendientes (sin fecha de envío real)
         List<InstanciaReporte> instanciasPendientes = instanciaRepository.findByFechaEnvioRealIsNull();
         
-        log.info("📊 Instancias pendientes encontradas: {}", instanciasPendientes.size());
+        log.info("Procesando {} instancias pendientes", instanciasPendientes.size());
         
         int alertasGeneradas = 0;
-        int errores = 0;
         
         for (InstanciaReporte instancia : instanciasPendientes) {
             try {
                 alertasGeneradas += procesarInstancia(instancia, hoy);
             } catch (Exception e) {
-                errores++;
-                log.error("❌ Error procesando instancia {}: {}", instancia.getId(), e.getMessage());
+                log.error("Error procesando instancia {}: {}", instancia.getId(), e.getMessage(), e);
             }
         }
         
         ultimaEjecucion = ahora;
-        
-        log.info("=================================================");
-        log.info("✅ Generación de alertas completada");
-        log.info("📧 Alertas enviadas: {}", alertasGeneradas);
-        if (errores > 0) {
-            log.warn("⚠️ Errores encontrados: {}", errores);
-        }
-        log.info("=================================================");
+        log.info("=== Generación de alertas completada. {} alertas enviadas ===", alertasGeneradas);
     }
 
+    /**
+     * Procesar una instancia y generar alertas según corresponda
+     */
     private int procesarInstancia(InstanciaReporte instancia, LocalDate hoy) {
         LocalDate fechaVencimiento = instancia.getFechaVencimientoCalculada();
         if (fechaVencimiento == null) return 0;
         
+        // Verificar que el reporte existe y está activo
         Reporte reporte = instancia.getReporte();
         if (reporte == null || !reporte.isActivo()) return 0;
         
         long diasHastaVencimiento = ChronoUnit.DAYS.between(hoy, fechaVencimiento);
         
+        // Los responsables están en el Reporte, no en la InstanciaReporte
         Usuario responsable = reporte.getResponsableElaboracion();
         Usuario supervisor = reporte.getResponsableSupervision();
         
@@ -146,7 +127,7 @@ public class AlertaScheduler {
         
         // === ALERTAS PARA RESPONSABLE ===
         if (responsable != null) {
-            // Preventiva (15 o 10 días antes)
+            // Alerta Preventiva (15 o 10 días antes)
             if (diasHastaVencimiento == 15 || diasHastaVencimiento == 10) {
                 if (generarAlertaResponsable(instancia, responsable, "PREVENTIVA", "verde",
                     construirMensajePreventiva(instancia, fechaVencimiento, diasHastaVencimiento))) {
@@ -154,7 +135,7 @@ public class AlertaScheduler {
                 }
             }
             
-            // Seguimiento (5 días antes)
+            // Alerta Seguimiento (5 días antes)
             if (diasHastaVencimiento == 5) {
                 if (generarAlertaResponsable(instancia, responsable, "SEGUIMIENTO", "amarillo",
                     construirMensajeSeguimiento(instancia, diasHastaVencimiento))) {
@@ -162,7 +143,7 @@ public class AlertaScheduler {
                 }
             }
             
-            // Riesgo (1 día antes)
+            // Alerta Riesgo (1 día antes)
             if (diasHastaVencimiento == 1) {
                 if (generarAlertaResponsable(instancia, responsable, "RIESGO", "naranja",
                     construirMensajeRiesgo(instancia))) {
@@ -170,7 +151,7 @@ public class AlertaScheduler {
                 }
             }
             
-            // Crítica (Vencido)
+            // Alerta Crítica (Vencido - se envía diariamente)
             if (diasHastaVencimiento < 0) {
                 long diasVencido = Math.abs(diasHastaVencimiento);
                 if (generarAlertaResponsable(instancia, responsable, "CRITICA", "rojo",
@@ -182,6 +163,7 @@ public class AlertaScheduler {
         
         // === ALERTAS PARA SUPERVISOR ===
         if (supervisor != null) {
+            // Alerta Supervisión (5 días antes)
             if (diasHastaVencimiento == 5) {
                 if (generarAlertaSupervisor(instancia, supervisor,
                     construirMensajeSupervisor5Dias(instancia, responsable))) {
@@ -189,6 +171,7 @@ public class AlertaScheduler {
                 }
             }
             
+            // Alerta Supervisión (1 día antes)
             if (diasHastaVencimiento == 1) {
                 if (generarAlertaSupervisor(instancia, supervisor,
                     construirMensajeSupervisor1Dia(instancia, responsable))) {
@@ -200,10 +183,14 @@ public class AlertaScheduler {
         return alertasGeneradas;
     }
 
+    /**
+     * Generar alerta para responsable
+     */
     private boolean generarAlertaResponsable(InstanciaReporte instancia, Usuario responsable, 
                                               String tipoNombre, String color, String mensaje) {
+        // Verificar si ya existe una alerta igual hoy
         if (existeAlertaHoy(instancia, responsable, tipoNombre)) {
-            log.debug("⏭️ Ya existe alerta {} para instancia {} hoy", tipoNombre, instancia.getId());
+            log.debug("Ya existe alerta {} para instancia {} hoy", tipoNombre, instancia.getId());
             return false;
         }
         
@@ -221,15 +208,19 @@ public class AlertaScheduler {
         
         alertaRepository.save(alerta);
         
+        // Enviar email
         String asunto = construirAsunto(instancia);
         emailService.enviarAlerta(responsable, asunto, mensaje, tipoNombre, color);
         
         String nombreReporte = instancia.getReporte() != null ? instancia.getReporte().getNombre() : String.valueOf(instancia.getId());
-        log.info("✅ Alerta {} enviada a {} para reporte {}", tipoNombre, responsable.getNombreCompleto(), nombreReporte);
+        log.info("✓ Alerta {} enviada a {} para reporte {}", tipoNombre, responsable.getNombreCompleto(), nombreReporte);
         
         return true;
     }
 
+    /**
+     * Generar alerta para supervisor
+     */
     private boolean generarAlertaSupervisor(InstanciaReporte instancia, Usuario supervisor, String mensaje) {
         String tipoNombre = "SUPERVISION";
         
@@ -251,15 +242,19 @@ public class AlertaScheduler {
         
         alertaRepository.save(alerta);
         
+        // Enviar email
         String asunto = "Supervisión: " + construirAsunto(instancia);
         emailService.enviarAlerta(supervisor, asunto, mensaje, tipoNombre, "azul");
         
         String nombreReporte = instancia.getReporte() != null ? instancia.getReporte().getNombre() : String.valueOf(instancia.getId());
-        log.info("✅ Alerta SUPERVISION enviada a {} para reporte {}", supervisor.getNombreCompleto(), nombreReporte);
+        log.info("✓ Alerta SUPERVISION enviada a {} para reporte {}", supervisor.getNombreCompleto(), nombreReporte);
         
         return true;
     }
 
+    /**
+     * Verificar si ya existe una alerta igual hoy
+     */
     private boolean existeAlertaHoy(InstanciaReporte instancia, Usuario usuario, String tipoNombre) {
         LocalDateTime inicioHoy = LocalDate.now().atStartOfDay();
         LocalDateTime finHoy = inicioHoy.plusDays(1);
@@ -268,6 +263,9 @@ public class AlertaScheduler {
                 instancia, usuario, tipoNombre, inicioHoy, finHoy);
     }
 
+    /**
+     * Obtener o crear tipo de alerta
+     */
     private TipoAlerta obtenerOCrearTipoAlerta(String nombre, String color) {
         Optional<TipoAlerta> existente = tipoAlertaRepository.findByNombre(nombre);
         
@@ -285,22 +283,19 @@ public class AlertaScheduler {
     }
 
     private Integer obtenerDiasAntes(String nombre) {
-        switch (nombre) {
-            case "PREVENTIVA":
-                return 10;
-            case "SEGUIMIENTO":
-                return 5;
-            case "RIESGO":
-                return 1;
-            case "CRITICA":
-                return 0;
-            case "SUPERVISION":
-                return 5;
-            default:
-                return 0;
-        }
+        return switch (nombre) {
+            case "PREVENTIVA" -> 10;
+            case "SEGUIMIENTO" -> 5;
+            case "RIESGO" -> 1;
+            case "CRITICA" -> 0;
+            case "SUPERVISION" -> 5;
+            default -> 0;
+        };
     }
 
+    /**
+     * Construir asunto del email
+     */
     private String construirAsunto(InstanciaReporte instancia) {
         StringBuilder asunto = new StringBuilder();
         
