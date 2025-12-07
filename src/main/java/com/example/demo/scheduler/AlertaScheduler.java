@@ -281,14 +281,20 @@ public class AlertaScheduler {
     }
 
     private Integer obtenerDiasAntes(String nombre) {
-        return switch (nombre) {
-            case "PREVENTIVA" -> 10;
-            case "SEGUIMIENTO" -> 5;
-            case "RIESGO" -> 1;
-            case "CRITICA" -> 0;
-            case "SUPERVISION" -> 5;
-            default -> 0;
-        };
+        switch (nombre) {
+            case "PREVENTIVA":
+                return 10;
+            case "SEGUIMIENTO":
+                return 5;
+            case "RIESGO":
+                return 1;
+            case "CRITICA":
+                return 0;
+            case "SUPERVISION":
+                return 5;
+            default:
+                return 0;
+        }
     }
 
     private String construirAsunto(InstanciaReporte instancia) {
