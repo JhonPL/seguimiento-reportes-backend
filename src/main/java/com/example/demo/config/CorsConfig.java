@@ -22,7 +22,8 @@ public class CorsConfig {
                 "http://localhost:3000",
                 "http://localhost:8081",
                 "http://127.0.0.1:5173",
-                "http://127.0.0.1:3000"
+                "http://127.0.0.1:3000",
+                "https://seguimiento-reportes-fronted-git-main-jhonpls-projects.vercel.app"
         ));
 
         // Permitir todos los métodos HTTP
