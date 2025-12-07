@@ -60,14 +60,18 @@ public class AlertaScheduler {
         // Ejecutar inmediatamente al iniciar (útil para testing)
         if (emailHabilitado) {
             log.info("🚀 Ejecutando generación de alertas al iniciar...");
-            new Thread(() -> {
-                try {
-                    Thread.sleep(5000); // Esperar 5 segundos para que el sistema termine de iniciar
-                    generarAlertasDiarias();
-                } catch (Exception e) {
-                    log.error("Error en ejecución inicial: {}", e.getMessage());
+            Thread hilo = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(5000); // Esperar 5 segundos para que el sistema termine de iniciar
+                        generarAlertasDiarias();
+                    } catch (Exception e) {
+                        log.error("Error en ejecución inicial: {}", e.getMessage());
+                    }
                 }
-            }).start();
+            });
+            hilo.start();
         }
     }
 
