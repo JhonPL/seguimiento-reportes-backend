@@ -135,13 +135,26 @@ public class EmailNotificationService {
     private String obtenerColorHex(String colorAlerta) {
         if (colorAlerta == null) return "#3B82F6";
         
-        return switch (colorAlerta.toLowerCase()) {
-            case "verde", "green" -> "#10B981";
-            case "amarillo", "amarilla", "yellow" -> "#F59E0B";
-            case "naranja", "orange" -> "#F97316";
-            case "rojo", "roja", "red" -> "#EF4444";
-            case "azul", "blue" -> "#3B82F6";
-            default -> "#3B82F6";
-        };
+        switch (colorAlerta.toLowerCase()) {
+            case "verde":
+            case "green":
+                return "#10B981";
+            case "amarillo":
+            case "amarilla":
+            case "yellow":
+                return "#F59E0B";
+            case "naranja":
+            case "orange":
+                return "#F97316";
+            case "rojo":
+            case "roja":
+            case "red":
+                return "#EF4444";
+            case "azul":
+            case "blue":
+                return "#3B82F6";
+            default:
+                return "#3B82F6";
+        }
     }
 }
