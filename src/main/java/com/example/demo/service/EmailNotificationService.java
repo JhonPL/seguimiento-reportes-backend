@@ -20,7 +20,10 @@ public class EmailNotificationService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username:}")
+    //@Value("${spring.mail.username:}")
+    //private String fromEmail;
+
+    @Value("${spring.mail.from:onboarding@resend.dev}")
     private String fromEmail;
 
     // ⚠️ CAMBIO CRÍTICO #1: Usar la variable correcta
