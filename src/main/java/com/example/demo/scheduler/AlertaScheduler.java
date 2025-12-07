@@ -51,7 +51,7 @@ public class AlertaScheduler {
     /**
      * Ejecutar todos los días a las 7:00 AM
      */
-    @Scheduled(cron = "0 05 1 * * *")
+    @Scheduled(cron = "0 0 11 * * *")
     @Transactional
     public void generarAlertasDiarias() {
         log.info("=== Iniciando generación de alertas diarias ===");
