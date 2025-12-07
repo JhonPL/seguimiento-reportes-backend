@@ -22,7 +22,7 @@ public class EmailNotificationService {
     @Value("${spring.mail.username:}")
     private String fromEmail;
 
-    @Value("${notificaciones.email.habilitado:false}")
+    @Value("${app.notifications.email.enabled:true}")
     private boolean emailEnabled;
 
     public EmailNotificationService(JavaMailSender mailSender) {
@@ -34,25 +34,13 @@ public class EmailNotificationService {
      */
     @Async
     public void enviarAlerta(Usuario usuario, String asunto, String mensaje, String tipoAlerta, String colorAlerta) {
-        log.info("📧 Intentando enviar email...");
-        log.info("   Habilitado: {}", emailEnabled);
-        log.info("   Remitente: {}", fromEmail);
-        log.info("   Destinatario: {}", usuario != null ? usuario.getCorreo() : "null");
-        
         if (!emailEnabled) {
-            log.warn("⚠️ Notificaciones por email DESHABILITADAS");
-            log.warn("⚠️ Configure NOTIFICATIONS_EMAIL_ENABLED=true en Render");
-            return;
-        }
-
-        if (fromEmail == null || fromEmail.isEmpty()) {
-            log.error("❌ spring.mail.username NO configurado");
-            log.error("❌ Configure SMTP_USER en Render");
+            log.info("Notificaciones por email deshabilitadas");
             return;
         }
 
         if (usuario == null || usuario.getCorreo() == null || usuario.getCorreo().isEmpty()) {
-            log.error("❌ Usuario no tiene correo configurado: {}", usuario != null ? usuario.getNombreCompleto() : "null");
+            log.warn("Usuario no tiene correo configurado");
             return;
         }
 
@@ -65,22 +53,19 @@ public class EmailNotificationService {
             String mensajeEmail = mensaje != null ? mensaje : "";
             String tipo = tipoAlerta != null ? tipoAlerta : "NOTIFICACIÓN";
             String color = colorAlerta != null ? colorAlerta : "azul";
+            String remitente = (fromEmail != null && !fromEmail.isEmpty()) ? fromEmail : "noreply@sistema.com";
             String destinatario = usuario.getCorreo();
 
-            helper.setFrom(fromEmail);
+            helper.setFrom(remitente);
             helper.setTo(destinatario);
             helper.setSubject("[" + tipo + "] " + asuntoEmail);
             helper.setText(construirHtmlEmail(nombreUsuario, mensajeEmail, tipo, color), true);
 
-            log.info("📤 Enviando email desde {} a {}", fromEmail, destinatario);
             mailSender.send(mimeMessage);
-            log.info("✅ Email enviado exitosamente a {}", destinatario);
+            log.info("Email enviado a {} - Asunto: {}", destinatario, asuntoEmail);
 
         } catch (MessagingException e) {
-            log.error("❌ Error enviando email a {}: {}", usuario.getCorreo(), e.getMessage());
-            log.error("❌ Verifique las credenciales SMTP en Render");
-        } catch (Exception e) {
-            log.error("❌ Error inesperado al enviar email: {}", e.getMessage(), e);
+            log.error("Error enviando email a {}: {}", usuario.getCorreo(), e.getMessage());
         }
     }
 
@@ -110,7 +95,7 @@ public class EmailNotificationService {
             <body>
                 <div class="container">
                     <div class="header">
-                        <h2>Sistema de Seguimiento de Reportes - Llanogas</h2>
+                        <h2>Sistema de Seguimiento de Reportes</h2>
                     </div>
                     <div class="content">
                         <p class="greeting">Hola <strong>%s</strong>,</p>
@@ -135,26 +120,13 @@ public class EmailNotificationService {
     private String obtenerColorHex(String colorAlerta) {
         if (colorAlerta == null) return "#3B82F6";
         
-        switch (colorAlerta.toLowerCase()) {
-            case "verde":
-            case "green":
-                return "#10B981";
-            case "amarillo":
-            case "amarilla":
-            case "yellow":
-                return "#F59E0B";
-            case "naranja":
-            case "orange":
-                return "#F97316";
-            case "rojo":
-            case "roja":
-            case "red":
-                return "#EF4444";
-            case "azul":
-            case "blue":
-                return "#3B82F6";
-            default:
-                return "#3B82F6";
-        }
+        return switch (colorAlerta.toLowerCase()) {
+            case "verde", "green" -> "#10B981";
+            case "amarillo", "amarilla", "yellow" -> "#F59E0B";
+            case "naranja", "orange" -> "#F97316";
+            case "rojo", "roja", "red" -> "#EF4444";
+            case "azul", "blue" -> "#3B82F6";
+            default -> "#3B82F6";
+        };
     }
 }
