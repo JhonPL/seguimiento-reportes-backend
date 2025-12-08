@@ -428,4 +428,61 @@ public class EstadisticasService {
             return "Pendiente";
         }
     }
+    // ================= AUDITOR =================
+
+    public Map<String, Object> obtenerDashboardAuditor(Integer anio, Integer mes, Integer trimestre) {
+        LocalDate hoy = LocalDate.now();
+        LocalDate fechaInicio;
+        LocalDate fechaFin;
+
+        // Determinar rango de fechas según filtros
+        if (anio != null && mes != null) {
+            // Filtro por mes específico
+            fechaInicio = LocalDate.of(anio, mes, 1);
+            fechaFin = fechaInicio.withDayOfMonth(fechaInicio.lengthOfMonth());
+        } else if (anio != null && trimestre != null) {
+            // Filtro por trimestre
+            int mesInicio = (trimestre - 1) * 3 + 1;
+            fechaInicio = LocalDate.of(anio, mesInicio, 1);
+            fechaFin = fechaInicio.plusMonths(2).withDayOfMonth(fechaInicio.plusMonths(2).lengthOfMonth());
+        } else if (anio != null) {
+            // Filtro por año completo
+            fechaInicio = LocalDate.of(anio, 1, 1);
+            fechaFin = LocalDate.of(anio, 12, 31);
+        } else {
+            // Sin filtro: últimos 12 meses
+            fechaInicio = hoy.minusMonths(12);
+            fechaFin = hoy;
+        }
+
+        List<InstanciaReporte> instancias = instanciaRepo.findByFechaVencimientoCalculadaBetween(fechaInicio, fechaFin);
+
+        // Estadísticas generales
+        EstadisticasDTO stats = calcularEstadisticasDesdeInstancias(instancias);
+
+        // Construir respuesta completa para auditor
+        Map<String, Object> resultado = new HashMap<>();
+        resultado.put("estadisticas", stats);
+        resultado.put("fechaInicio", fechaInicio);
+        resultado.put("fechaFin", fechaFin);
+        resultado.put("totalInstancias", instancias.size());
+
+        // Cumplimiento por entidad
+        Map<String, Map<String, Long>> porEntidad = instancias.stream()
+                .filter(i -> i.getReporte() != null && i.getReporte().getEntidad() != null)
+                .collect(Collectors.groupingBy(
+                        i -> i.getReporte().getEntidad().getRazonSocial(),
+                        Collectors.groupingBy(this::clasificarEstado, Collectors.counting())));
+        resultado.put("cumplimientoPorEntidad", porEntidad);
+
+        // Cumplimiento por responsable
+        Map<String, Map<String, Long>> porResponsable = instancias.stream()
+                .filter(i -> i.getReporte() != null && i.getReporte().getResponsableElaboracion() != null)
+                .collect(Collectors.groupingBy(
+                        i -> i.getReporte().getResponsableElaboracion().getNombreCompleto(),
+                        Collectors.groupingBy(this::clasificarEstado, Collectors.counting())));
+        resultado.put("cumplimientoPorResponsable", porResponsable);
+
+        return resultado;
+    }
 }
